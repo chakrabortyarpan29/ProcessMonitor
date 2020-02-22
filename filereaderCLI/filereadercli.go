@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,7 +36,7 @@ func triggerReadFile(d time.Duration, cb callBackChan) {
 	}
 }
 
-func readFile(path string, prduct string) {
+func readFile(path string, prduct string, wg *sync.WaitGroup) {
 	path = path + "/" + prduct + ".txt"
 	file, err := os.Open(path)
 	if err != nil {
@@ -45,6 +47,7 @@ func readFile(path string, prduct string) {
 	for scanner.Scan() {
 		fmt.Println(scanner.Text())
 	}
+	wg.Done()
 }
 
 func main() {
@@ -55,17 +58,19 @@ func main() {
 	} else {
 		log.Fatal("Product Name not provided")
 	}
+	appLsit := strings.Split(appName, ",")
+	numberOfWork := len(appLsit)
+	var wg sync.WaitGroup
 	cb := make(callBackChan)
 	go triggerReadFile(10*time.Second, cb)
-	go func() {
-		for {
-			select {
-			case <-cb:
-				readFile(home, appName)
+	for {
+		select {
+		case <-cb:
+			for i := 0; i < numberOfWork; i++ {
+				wg.Add(1)
+				go readFile(home, appLsit[i], &wg)
 			}
 		}
-	}()
-	for {
-		time.Sleep(10 * time.Second)
 	}
+	wg.Wait()
 }
